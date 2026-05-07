@@ -625,25 +625,27 @@ class IcebergHandlerTest {
 
   @Test
   @SneakyThrows
-  void testGetDatasetIdentifierForSnowflakeRestCatalog() {
+  void testGetDatasetIdentifierForSnowflakeHorizonRestCatalog() {
+    String catalogName = "test";
+    String catalogUri = "https://myorg-myaccount.snowflakecomputing.com/polaris/api/catalog";
+    String warehouse = "MY_DATABASE";
+    String tableLocation = "s3://my-bucket/warehouse/MY_TABLE";
+
     when(sparkSession.conf()).thenReturn(runtimeConfig);
     when(runtimeConfig.getAll())
         .thenReturn(
             new Map.Map3<>(
-                "spark.sql.catalog.test.type",
-                "rest",
-                "spark.sql.catalog.test.uri",
-                "https://myorg-myaccount.snowflakecomputing.com/polaris/api/catalog",
-                "spark.sql.catalog.test.warehouse",
-                "MY_DATABASE"));
+                "spark.sql.catalog." + catalogName + ".type", "rest",
+                "spark.sql.catalog." + catalogName + ".uri", catalogUri,
+                "spark.sql.catalog." + catalogName + ".warehouse", warehouse));
 
     SparkCatalog sparkCatalog = mock(SparkCatalog.class);
     SparkTable sparkTable = mock(SparkTable.class, RETURNS_DEEP_STUBS);
     Identifier identifier = Identifier.of(new String[] {"MY_SCHEMA"}, "MY_TABLE");
 
-    when(sparkCatalog.name()).thenReturn("test");
+    when(sparkCatalog.name()).thenReturn(catalogName);
     when(sparkCatalog.loadTable(identifier)).thenReturn(sparkTable);
-    when(sparkTable.table().location()).thenReturn("s3://my-bucket/warehouse/MY_TABLE");
+    when(sparkTable.table().location()).thenReturn(tableLocation);
 
     DatasetIdentifier datasetIdentifier =
         icebergHandler.getDatasetIdentifier(
@@ -651,7 +653,7 @@ class IcebergHandlerTest {
 
     assertThat(datasetIdentifier)
         .hasFieldOrPropertyWithValue("namespace", SnowflakeUtils.SNOWFLAKE_NAMESPACE_PREFIX + "myorg-myaccount")
-        .hasFieldOrPropertyWithValue("name", "MY_DATABASE.MY_SCHEMA.MY_TABLE");
+        .hasFieldOrPropertyWithValue("name", warehouse + ".MY_SCHEMA.MY_TABLE");
 
     assertThat(datasetIdentifier.getSymlinks())
         .singleElement()
@@ -661,17 +663,18 @@ class IcebergHandlerTest {
   }
 
   @Test
-  void testGetSnowflakeRestCatalogData() {
-    SparkCatalog sparkCatalog = setupCatalogFacetMocks("snowflake_catalog");
+  void testGetSnowflakeHorizonRestCatalogData() {
+    String catalogName = "snowflake_horizon_catalog";
+    String catalogUri = "https://myorg-myaccount.snowflakecomputing.com/polaris/api/catalog";
+    String warehouseUri = "s3://my-bucket/warehouse";
+
+    SparkCatalog sparkCatalog = setupCatalogFacetMocks(catalogName);
     when(runtimeConfig.getAll())
         .thenReturn(
             new Map.Map3(
-                "spark.sql.catalog.snowflake_catalog.type",
-                "rest",
-                "spark.sql.catalog.snowflake_catalog.uri",
-                "https://myorg-myaccount.snowflakecomputing.com/polaris/api/catalog",
-                "spark.sql.catalog.snowflake_catalog.warehouse",
-                "s3://my-bucket/warehouse"));
+                "spark.sql.catalog." + catalogName + ".type", "rest",
+                "spark.sql.catalog." + catalogName + ".uri", catalogUri,
+                "spark.sql.catalog." + catalogName + ".warehouse", warehouseUri));
 
     Optional<CatalogHandler.CatalogWithAdditionalFacets> catalogDatasetFacet =
         icebergHandler.getCatalogDatasetFacet(sparkCatalog, new HashMap<>());
@@ -679,12 +682,10 @@ class IcebergHandlerTest {
 
     OpenLineage.CatalogDatasetFacet facet = catalogDatasetFacet.get().getCatalogDatasetFacet();
 
-    assertEquals("snowflake_catalog", facet.getName());
+    assertEquals(catalogName, facet.getName());
     assertEquals("rest", facet.getType());
-    assertEquals("s3://my-bucket/warehouse", facet.getWarehouseUri());
-    assertEquals(
-        "https://myorg-myaccount.snowflakecomputing.com/polaris/api/catalog",
-        facet.getMetadataUri());
+    assertEquals(warehouseUri, facet.getWarehouseUri());
+    assertEquals(catalogUri, facet.getMetadataUri());
     assertEquals("iceberg", facet.getFramework());
     assertThat(facet.getCatalogProperties().getAdditionalProperties())
         .hasFieldOrPropertyWithValue("account_identifier", "myorg-myaccount");
