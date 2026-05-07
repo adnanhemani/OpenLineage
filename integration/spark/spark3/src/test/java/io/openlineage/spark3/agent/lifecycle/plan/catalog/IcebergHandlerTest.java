@@ -58,6 +58,15 @@ class IcebergHandlerTest {
   private Configuration hadoopConf = new Configuration();
   private RuntimeConfig runtimeConfig = mock(RuntimeConfig.class);
 
+  private SparkCatalog setupCatalogFacetMocks(String catalogName) {
+    SparkCatalog sparkCatalog = mock(SparkCatalog.class);
+    when(context.getSparkSession()).thenReturn(Optional.of(sparkSession));
+    when(context.getOpenLineage()).thenReturn(new OpenLineage(URI.create("http://localhost")));
+    when(sparkSession.conf()).thenReturn(runtimeConfig);
+    when(sparkCatalog.name()).thenReturn(catalogName);
+    return sparkCatalog;
+  }
+
   @ParameterizedTest
   @CsvSource({
     "hdfs://namenode:8020/tmp/warehouse,hdfs://namenode:8020/tmp/warehouse,hdfs://namenode:8020,/tmp/warehouse/database/table",
@@ -472,11 +481,7 @@ class IcebergHandlerTest {
 
   @Test
   void testGetHadoopCatalogData() {
-    SparkCatalog sparkCatalog = mock(SparkCatalog.class);
-    when(context.getSparkSession()).thenReturn(Optional.of(sparkSession));
-    when(context.getOpenLineage()).thenReturn(new OpenLineage(URI.create("http://localhost")));
-    when(sparkSession.conf()).thenReturn(runtimeConfig);
-    when(sparkCatalog.name()).thenReturn("test");
+    SparkCatalog sparkCatalog = setupCatalogFacetMocks("test");
     when(runtimeConfig.getAll())
         .thenReturn(
             new Map.Map2(
@@ -500,11 +505,7 @@ class IcebergHandlerTest {
 
   @Test
   void testGetGlueCatalogData() {
-    SparkCatalog sparkCatalog = mock(SparkCatalog.class);
-    when(context.getSparkSession()).thenReturn(Optional.of(sparkSession));
-    when(context.getOpenLineage()).thenReturn(new OpenLineage(URI.create("http://localhost")));
-    when(sparkSession.conf()).thenReturn(runtimeConfig);
-    when(sparkCatalog.name()).thenReturn("test");
+    SparkCatalog sparkCatalog = setupCatalogFacetMocks("test");
     when(runtimeConfig.getAll()).thenReturn(new Map.Map1("spark.sql.catalog.test.type", "hadoop"));
 
     Optional<CatalogHandler.CatalogWithAdditionalFacets> catalogDatasetFacet =
@@ -520,11 +521,7 @@ class IcebergHandlerTest {
 
   @Test
   void testGetJdbcCatalogData() {
-    SparkCatalog sparkCatalog = mock(SparkCatalog.class);
-    when(context.getSparkSession()).thenReturn(Optional.of(sparkSession));
-    when(context.getOpenLineage()).thenReturn(new OpenLineage(URI.create("http://localhost")));
-    when(sparkSession.conf()).thenReturn(runtimeConfig);
-    when(sparkCatalog.name()).thenReturn("test");
+    SparkCatalog sparkCatalog = setupCatalogFacetMocks("test");
     when(runtimeConfig.getAll())
         .thenReturn(
             new Map.Map3(
@@ -552,11 +549,7 @@ class IcebergHandlerTest {
 
   @Test
   void testGetBigQueryMetastoreCatalogData() {
-    SparkCatalog sparkCatalog = mock(SparkCatalog.class);
-    when(context.getSparkSession()).thenReturn(Optional.of(sparkSession));
-    when(context.getOpenLineage()).thenReturn(new OpenLineage(URI.create("http://localhost")));
-    when(sparkSession.conf()).thenReturn(runtimeConfig);
-    when(sparkCatalog.name()).thenReturn("bq_metastore_catalog");
+    SparkCatalog sparkCatalog = setupCatalogFacetMocks("bq_metastore_catalog");
     when(runtimeConfig.getAll())
         .thenReturn(
             new Map.Map4(
@@ -633,9 +626,6 @@ class IcebergHandlerTest {
   @Test
   @SneakyThrows
   void testGetDatasetIdentifierForSnowflakeRestCatalog() {
-    // In a Polaris/Snowflake REST catalog, `warehouse` is the Snowflake database name (e.g.
-    // "MY_DATABASE"), not an S3 path. The identifier namespace is just ["MY_SCHEMA"] because the
-    // database is already conveyed by the warehouse setting.
     when(sparkSession.conf()).thenReturn(runtimeConfig);
     when(runtimeConfig.getAll())
         .thenReturn(
@@ -649,8 +639,6 @@ class IcebergHandlerTest {
 
     SparkCatalog sparkCatalog = mock(SparkCatalog.class);
     SparkTable sparkTable = mock(SparkTable.class, RETURNS_DEEP_STUBS);
-    // In a 3-level namespace (database.schema.table) Polaris catalog, the identifier passed to
-    // Spark only contains the schema and table; the database comes from the warehouse config.
     Identifier identifier = Identifier.of(new String[] {"MY_SCHEMA"}, "MY_TABLE");
 
     when(sparkCatalog.name()).thenReturn("test");
@@ -661,8 +649,6 @@ class IcebergHandlerTest {
         icebergHandler.getDatasetIdentifier(
             sparkSession, sparkCatalog, identifier, new HashMap<>());
 
-    // SnowflakeCatalogTypeHandler#shouldOverridePrimary() returns true, so the Snowflake
-    // identifier is the primary and the physical S3 location becomes the symlink.
     assertThat(datasetIdentifier)
         .hasFieldOrPropertyWithValue("namespace", SnowflakeUtils.SNOWFLAKE_NAMESPACE_PREFIX + "myorg-myaccount")
         .hasFieldOrPropertyWithValue("name", "MY_DATABASE.MY_SCHEMA.MY_TABLE");
@@ -676,11 +662,7 @@ class IcebergHandlerTest {
 
   @Test
   void testGetSnowflakeRestCatalogData() {
-    SparkCatalog sparkCatalog = mock(SparkCatalog.class);
-    when(context.getSparkSession()).thenReturn(Optional.of(sparkSession));
-    when(context.getOpenLineage()).thenReturn(new OpenLineage(URI.create("http://localhost")));
-    when(sparkSession.conf()).thenReturn(runtimeConfig);
-    when(sparkCatalog.name()).thenReturn("snowflake_catalog");
+    SparkCatalog sparkCatalog = setupCatalogFacetMocks("snowflake_catalog");
     when(runtimeConfig.getAll())
         .thenReturn(
             new Map.Map3(
@@ -710,11 +692,7 @@ class IcebergHandlerTest {
 
   @Test
   void testGetBigLakeRestCatalogData() {
-    SparkCatalog sparkCatalog = mock(SparkCatalog.class);
-    when(context.getSparkSession()).thenReturn(Optional.of(sparkSession));
-    when(context.getOpenLineage()).thenReturn(new OpenLineage(URI.create("http://localhost")));
-    when(sparkSession.conf()).thenReturn(runtimeConfig);
-    when(sparkCatalog.name()).thenReturn("biglake_rest_catalog");
+    SparkCatalog sparkCatalog = setupCatalogFacetMocks("biglake_rest_catalog");
     when(runtimeConfig.getAll())
         .thenReturn(
             new Map.Map4(
@@ -745,11 +723,7 @@ class IcebergHandlerTest {
 
   @Test
   void testGetBigQueryMetastoreLegacyCatalogData() {
-    SparkCatalog sparkCatalog = mock(SparkCatalog.class);
-    when(context.getSparkSession()).thenReturn(Optional.of(sparkSession));
-    when(context.getOpenLineage()).thenReturn(new OpenLineage(URI.create("http://localhost")));
-    when(sparkSession.conf()).thenReturn(runtimeConfig);
-    when(sparkCatalog.name()).thenReturn("bq_metastore_catalog");
+    SparkCatalog sparkCatalog = setupCatalogFacetMocks("bq_metastore_catalog");
     when(runtimeConfig.getAll())
         .thenReturn(
             new Map.Map4(
