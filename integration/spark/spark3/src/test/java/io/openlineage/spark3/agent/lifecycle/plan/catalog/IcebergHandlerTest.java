@@ -627,9 +627,14 @@ class IcebergHandlerTest {
   @SneakyThrows
   void testGetDatasetIdentifierForSnowflakeHorizonRestCatalog() {
     String catalogName = "test";
-    String catalogUri = "https://myorg-myaccount.snowflakecomputing.com/polaris/api/catalog";
+    String accountIdentifier = "myorg-myaccount";
+    String catalogUri = "https://" + accountIdentifier + ".snowflakecomputing.com/polaris/api/catalog";
     String warehouse = "MY_DATABASE";
-    String tableLocation = "s3://my-bucket/warehouse/MY_TABLE";
+    String schema = "MY_SCHEMA";
+    String table = "MY_TABLE";
+    String tableS3Bucket = "s3://my-bucket";
+    String tableS3Path = "warehouse/" + table;
+    String tableLocation = tableS3Bucket + "/" + tableS3Path;
 
     when(sparkSession.conf()).thenReturn(runtimeConfig);
     when(runtimeConfig.getAll())
@@ -641,7 +646,7 @@ class IcebergHandlerTest {
 
     SparkCatalog sparkCatalog = mock(SparkCatalog.class);
     SparkTable sparkTable = mock(SparkTable.class, RETURNS_DEEP_STUBS);
-    Identifier identifier = Identifier.of(new String[] {"MY_SCHEMA"}, "MY_TABLE");
+    Identifier identifier = Identifier.of(new String[] {schema}, table);
 
     when(sparkCatalog.name()).thenReturn(catalogName);
     when(sparkCatalog.loadTable(identifier)).thenReturn(sparkTable);
@@ -652,20 +657,21 @@ class IcebergHandlerTest {
             sparkSession, sparkCatalog, identifier, new HashMap<>());
 
     assertThat(datasetIdentifier)
-        .hasFieldOrPropertyWithValue("namespace", SnowflakeUtils.SNOWFLAKE_NAMESPACE_PREFIX + "myorg-myaccount")
-        .hasFieldOrPropertyWithValue("name", warehouse + ".MY_SCHEMA.MY_TABLE");
+        .hasFieldOrPropertyWithValue("namespace", SnowflakeUtils.SNOWFLAKE_NAMESPACE_PREFIX + accountIdentifier)
+        .hasFieldOrPropertyWithValue("name", warehouse + "." + schema + "." + table);
 
     assertThat(datasetIdentifier.getSymlinks())
         .singleElement()
-        .hasFieldOrPropertyWithValue("namespace", "s3://my-bucket")
-        .hasFieldOrPropertyWithValue("name", "warehouse/MY_TABLE")
+        .hasFieldOrPropertyWithValue("namespace", tableS3Bucket)
+        .hasFieldOrPropertyWithValue("name", tableS3Path)
         .hasFieldOrPropertyWithValue("type", DatasetIdentifier.SymlinkType.TABLE);
   }
 
   @Test
   void testGetSnowflakeHorizonRestCatalogData() {
     String catalogName = "snowflake_horizon_catalog";
-    String catalogUri = "https://myorg-myaccount.snowflakecomputing.com/polaris/api/catalog";
+    String accountIdentifier = "myorg-myaccount";
+    String catalogUri = "https://" + accountIdentifier + ".snowflakecomputing.com/polaris/api/catalog";
     String warehouseUri = "s3://my-bucket/warehouse";
 
     SparkCatalog sparkCatalog = setupCatalogFacetMocks(catalogName);
@@ -688,7 +694,7 @@ class IcebergHandlerTest {
     assertEquals(catalogUri, facet.getMetadataUri());
     assertEquals("iceberg", facet.getFramework());
     assertThat(facet.getCatalogProperties().getAdditionalProperties())
-        .hasFieldOrPropertyWithValue("account_identifier", "myorg-myaccount");
+        .hasFieldOrPropertyWithValue("account_identifier", accountIdentifier);
   }
 
   @Test
